@@ -1,0 +1,28 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+//this code creates the classrooms table with id,name,capacity
+model classrooms {
+  id        Int      @id @default(autoincrement())
+  name      String
+  capacity  Int
+  students  students[]
+}
+//this code creates the students table with id,name,gender,classroom_id foreignkey to id in clasrooms table, profile_image_path
+model students {
+  id            Int      @id @default(autoincrement())
+  name          String
+  gender        String
+  classroom     classrooms  @relation(fields: [classroom_id], references: [id])
+  classroom_id  Int
+  profile_image_path String?
+  age           Int?
+}
