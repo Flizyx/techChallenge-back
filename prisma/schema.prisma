@@ -26,3 +26,18 @@ model students {
   profile_image_path String?
   age           Int?
 }
+
+//this code creates the users table with id,email,name,password,role
+model users {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  password  String?
+  role      Role     @default(USER)
+}
+
+//this code creates an enum type for role with values USER and ADMIN
+enum Role {
+  USER
+  ADMIN
+}
