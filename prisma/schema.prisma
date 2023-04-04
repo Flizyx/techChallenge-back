@@ -25,6 +25,13 @@ model students {
   classroom_id  Int
   profile_image_path String?
   age           Int?
+  siblings      siblings[]
+}
+model siblings {
+  id            Int      @id @default(autoincrement())
+  student       students @relation(fields: [student_id], references: [id])
+  student_id    Int
+  sibling_id    Int
 }
 
 //this code creates the users table with id,email,name,password,role

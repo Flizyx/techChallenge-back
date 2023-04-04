@@ -63,7 +63,7 @@ app.post('/login', async (req, res) => {
         if (!passwordMatch) {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
-        const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET);
+        const token = jwt.sign({ userId: user.id , role: user.role}, process.env.JWT_SECRET);
         res.json({ token });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -115,20 +115,228 @@ app.put('/classrooms/:id', async (req, res) => {
         res.status(500).json({ error: error.message })
     }
 })
-
-// delete an existing classroom by id
-app.delete('/classrooms/:id', async (req, res) => {
+// delete specific classroom
+app.delete('/classrooms/:id', authenticateToken, async (req, res) => {
     try {
-        const id = parseInt(req.params.id)
-        const classroom = await prisma.classrooms.delete({
-            where: { id }
-        })
-        res.json(classroom)
+      const id = parseInt(req.params.id);
+      const classroom = await prisma.classrooms.delete({
+        where: { id },
+      });
+      res.json(classroom);
     } catch (error) {
-        res.status(500).json({ error: error.message })
+      res.status(500).json({ error: error.message });
     }
-})
+  });
+// get all students
+app.get('/students', async (req, res) => {
+try {
+    const students = await prisma.students.findMany({
+    include: { classroom: true, siblings: true },
+    });
+    res.json(students);
+} catch (error) {
+    res.status(500).json({ error: error.message });
+}
+});
+//get specific student
+app.get('/students/:id', async (req, res) => {
+try {
+    const id = parseInt(req.params.id);
+    const student = await prisma.students.findUnique({
+    where: { id },
+    include: { classroom: true, siblings: true },
+    });
+    const studentsWithSiblings = await prisma.students.findMany({
+        include: {
+          siblings: true
+        },
+        where: {
+          siblings: {
+            some: {}
+          }
+        }
+      })
+    console.log(studentsWithSiblings)
+    res.json(student);
+} catch (error) {
+    res.status(500).json({ error: error.message });
+}
+});
+//create student (auth required)
+app.post('/students', authenticateToken, async (req, res) => {
+try {
+    const { name, gender, classroom_id,age,siblings } = req.body;
+    const student = await prisma.students.create({
+        data: { 
+            name,
+            gender,
+            classroom_id,
+            age,
+            siblings 
+        },
+    include: { classroom: true,siblings:true },
+    });
+    res.json(student);
+} catch (error) {
+    res.status(500).json({ error: error.message });
+}
+});
+//create student siblings
+app.post('/students/:id/siblings', authenticateToken, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { siblings } = req.body;
+      // Check if siblings already exist
+      const existingSiblings = await prisma.siblings.findMany({
+        where: {
+          AND: [
+            { student_id: parseInt(id) },
+            { sibling_id: { in: siblings } },
+          ],
+        },
+      });
+      const existingSiblings2 = await prisma.siblings.findMany({
+        where: {
+          AND: [
+            { student_id: { in: siblings } },
+            { sibling_id: parseInt(id) },
+          ],
+        },
+      });
+      if (existingSiblings.length > 0 || existingSiblings2.length > 0) {
+        return res.status(400).json({
+          error:
+            'One or more of the provided siblings already exist for this student.',
+        });
+      }
+      // Create the siblings
+      const newSiblings = await Promise.all(
+        siblings.map((siblingId) =>
+          prisma.siblings.create({
+            data: {
+              student: {
+                connect: { id: parseInt(id) },
+              },
+              sibling_id: siblingId,
+            },
+          })
+        )
+      );
+  
+      // Connect the siblings to the student
+      const updatedStudent = await prisma.students.update({
+        where: { id: parseInt(id) },
+        data: {
+          siblings: {
+            connect: newSiblings.map((sibling) => ({ id: sibling.id })),
+          },
+        },
+        include: { siblings: true },
+      });
+  
+      res.json(updatedStudent);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+//search specific student siblings
+app.get('/students/:id/siblings', authenticateToken, async (req, res) => {
+    try {
+      const { id } = req.params;
+  
+      // Find the student's siblings
+      const siblings = await prisma.siblings.findMany({
+        where: {
+          OR: [
+            { student_id: parseInt(id) },
+            { sibling_id: parseInt(id) },
+          ],
+        },
+        include: { 
+          student: true,
+        },
+      });
+  
+      if (siblings.length === 0) {
+        return res.json({
+          message: 'Este estudiante no tiene hermanos.',
+        });
+      }
 
+      const siblingsWithInfo = await Promise.all(siblings.map(async (sibling) => {
+        const siblingInfo = await prisma.students.findUnique({
+          where: {
+            id: sibling.sibling_id,
+          },
+        });
+
+        return {
+          id: sibling.id,
+          student_id: sibling.student_id,
+          sibling_id: sibling.sibling_id,
+          student: sibling.student,
+          sibling: siblingInfo,
+        };
+      }));
+  
+      res.json(siblingsWithInfo);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+//delete student sibling
+app.delete('/students/siblings/:id', authenticateToken, async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        const sibling = await prisma.siblings.delete({
+            where: { id },
+        });
+        res.json(sibling);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+// modify student (auth req)
+app.put('/students/:id', authenticateToken, async (req, res) => {
+try {
+    const id = parseInt(req.params.id);
+    const { name, gender, classroom_id,age,siblings  } = req.body;
+    const student = await prisma.students.update({
+    where: { id },
+    data: { name, gender, classroom_id,age,siblings  },
+    include: { classroom: true,siblings:true },
+    });
+    res.json(student);
+} catch (error) {
+    res.status(500).json({ error: error.message });
+}
+});
+//delete student
+app.delete('/students/:id', authenticateToken, async (req, res) => {
+try {
+    const id = parseInt(req.params.id);
+    const student = await prisma.students.delete({
+    where: { id },
+    include: { classroom: true },
+    });
+    res.json(student);
+} catch (error) {
+    res.status(500).json({ error: error.message });
+}
+});
+// validate if a user has admin privileges
+function authenticateToken(req, res, next) {
+const authHeader = req.headers['authorization'];
+const token = authHeader && authHeader.split(' ')[1];
+if (token == null) return res.sendStatus(401);
+
+jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) {return res.sendStatus(403);}
+    if (user.role !== 'ADMIN') return res.sendStatus(403);
+    req.user = user;
+    next();
+});
+}
 app.listen(3000, () =>
     console.log('server ready at: http://localhost:3000')
 );
