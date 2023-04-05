@@ -10,7 +10,7 @@ app.use(express.json())
 app.get('/', (req, res) => {
     res.send('Hola mundo')
 })
-
+const PORT = process.env.PORT || 3001
 
 
 // get all classrooms
@@ -189,24 +189,22 @@ app.post('/students/:id/siblings', authenticateToken, async (req, res) => {
       // Check if siblings already exist
       const existingSiblings = await prisma.siblings.findMany({
         where: {
-          AND: [
-            { student_id: parseInt(id) },
-            { sibling_id: { in: siblings } },
+          OR: [
+            {
+              student_id: parseInt(id),
+              sibling_id: { in: siblings },
+            },
+            {
+              student_id: { in: siblings },
+              sibling_id: parseInt(id),
+            },
           ],
         },
       });
-      const existingSiblings2 = await prisma.siblings.findMany({
-        where: {
-          AND: [
-            { student_id: { in: siblings } },
-            { sibling_id: parseInt(id) },
-          ],
-        },
-      });
-      if (existingSiblings.length > 0 || existingSiblings2.length > 0) {
+      if (existingSiblings.length > 0) {
         return res.status(400).json({
           error:
-            'One or more of the provided siblings already exist for this student.',
+          'One or more of the provided siblings already exist for this student.',
         });
       }
       // Create the siblings
@@ -259,7 +257,7 @@ app.get('/students/:id/siblings', authenticateToken, async (req, res) => {
   
       if (siblings.length === 0) {
         return res.json({
-          message: 'Este estudiante no tiene hermanos.',
+          message: 'this student does not have siblings',
         });
       }
 
@@ -337,6 +335,6 @@ jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     next();
 });
 }
-app.listen(3000, () =>
-    console.log('server ready at: http://localhost:3000')
+app.listen(PORT, () =>
+    console.log('server ready at: http://localhost:'+PORT)
 );
