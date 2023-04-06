@@ -68,7 +68,9 @@ app.post('/login', async (req, res) => {
         if (!passwordMatch) {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
-        const token = jwt.sign({ userId: user.id , role: user.role}, process.env.JWT_SECRET);
+        // const token = jwt.sign({ userId: user.id , role: user.role}, process.env.JWT_SECRET);
+        const token = jwt.sign({ userId: user.id ,
+           role: user.role, exp: Date.now() + (1000*(24*60 * 60))}, process.env.JWT_SECRET); //10 hours
         res.json({ token });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -329,16 +331,18 @@ try {
 });
 // validate if a user has admin privileges
 function authenticateToken(req, res, next) {
-const authHeader = req.headers['authorization'];
-const token = authHeader && authHeader.split(' ')[1];
-if (token == null) return res.sendStatus(401);
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (token == null) return res.sendStatus(401);
 
-jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {return res.sendStatus(403);}
-    if (user.role !== 'ADMIN') return res.sendStatus(403);
-    req.user = user;
-    next();
-});
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+      console.log("now: ",user,Date.now(),"difference:",(user.exp-Date.now())/1000)
+        if (err) {return res.sendStatus(403);}
+        if (user.role !== 'ADMIN') return res.sendStatus(403);
+        if (user.exp < Date.now()) return res.sendStatus(401);
+        req.user = user;
+        next();
+    });
 }
 app.listen(PORT, () =>
     console.log('server ready at: http://localhost:'+PORT)
