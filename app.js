@@ -9,7 +9,8 @@ const app = express()
 app.use(express.json())
 app.use(function(req, res, next) {
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+  res.header('Access-Control-Allow-Headers', 'Authorization');
   next();
 });
 app.get('/', (req, res) => {
@@ -163,7 +164,7 @@ try {
           }
         }
       })
-    console.log(studentsWithSiblings)
+    // console.log(studentsWithSiblings)
     res.json(student);
 } catch (error) {
     res.status(500).json({ error: error.message });
@@ -336,7 +337,7 @@ function authenticateToken(req, res, next) {
     if (token == null) return res.sendStatus(401);
 
     jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-      console.log("now: ",user,Date.now(),"difference:",(user.exp-Date.now())/1000)
+      // console.log("now: ",user,Date.now(),"difference:",(user.exp-Date.now())/1000)
         if (err) {return res.sendStatus(403);}
         if (user.role !== 'ADMIN') return res.sendStatus(403);
         if (user.exp < Date.now()) return res.sendStatus(401);
