@@ -11,6 +11,7 @@ app.use(function(req, res, next) {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
   res.header('Access-Control-Allow-Headers', 'Authorization');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
   next();
 });
 app.get('/', (req, res) => {
@@ -59,6 +60,8 @@ app.get('/classrooms', async (req, res) => {
 app.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
+        console.log(req.body);
+        console.log(email, password);
         const user = await prisma.users.findUnique({
             where: { email },
         });
