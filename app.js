@@ -60,8 +60,6 @@ app.get('/classrooms', async (req, res) => {
 app.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        console.log(req.body);
-        console.log(email, password);
         const user = await prisma.users.findUnique({
             where: { email },
         });
@@ -167,7 +165,6 @@ try {
           }
         }
       })
-    // console.log(studentsWithSiblings)
     res.json(student);
 } catch (error) {
     res.status(500).json({ error: error.message });
@@ -340,7 +337,6 @@ function authenticateToken(req, res, next) {
     if (token == null) return res.sendStatus(401);
 
     jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-      // console.log("now: ",user,Date.now(),"difference:",(user.exp-Date.now())/1000)
         if (err) {return res.sendStatus(403);}
         if (user.role !== 'ADMIN') return res.sendStatus(403);
         if (user.exp < Date.now()) return res.sendStatus(401);
