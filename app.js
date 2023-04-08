@@ -416,7 +416,7 @@ try {
 }
 });
 //delete student
-app.delete('/students/:id', authenticateToken, async (req, res) => {
+app.delete('/students2/:id', authenticateToken, async (req, res) => {
 try {
     const id = parseInt(req.params.id);
     const student = await prisma.students.delete({
@@ -427,6 +427,32 @@ try {
 } catch (error) {
     res.status(500).json({ error: error.message });
 }
+});
+//delete student with sibling relationships
+app.delete('/students/:id', authenticateToken, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    
+    // Delete sibling records for the student or the student's siblings
+    await prisma.siblings.deleteMany({
+      where: {
+        OR: [
+          { student_id: id },
+          { sibling_id: id }
+        ]
+      }
+    });
+
+    // Delete the student record
+    const deletedStudent = await prisma.students.delete({
+      where: { id },
+      include: { classroom: true },
+    });
+
+    res.json(deletedStudent);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 // validate if a user has admin privileges
 function authenticateToken(req, res, next) {
