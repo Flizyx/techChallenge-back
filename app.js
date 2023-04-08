@@ -19,15 +19,7 @@ app.get('/', (req, res) => {
 const PORT = process.env.PORT || 3001
 
 
-// get all classrooms
-app.get('/classrooms', async (req, res) => {
-    try {
-        const classrooms = await prisma.classrooms.findMany()
-        res.json(classrooms)
-    } catch (error) {
-        res.status(500).json({ error: error.message })
-    }
-})
+
 // app.post('/register', async (req, res) => {
 //     try {
 //         const { name, email, password } = req.body;
@@ -56,6 +48,18 @@ app.get('/classrooms', async (req, res) => {
 //         res.status(500).json({ error: error.message });
 //     }
 // });
+
+
+// get all classrooms
+app.get('/classrooms', async (req, res) => {
+  try {
+      const classrooms = await prisma.classrooms.findMany()
+      res.json(classrooms)
+  } catch (error) {
+      res.status(500).json({ error: error.message })
+  }
+})
+
 app.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -97,7 +101,7 @@ app.get('/classrooms/:id', async (req, res) => {
 })
 
 // create a new classroom
-app.post('/classrooms', async (req, res) => {
+app.post('/classrooms', authenticateToken,async (req, res) => {
     try {
         const { name, capacity } = req.body
         const classroom = await prisma.classrooms.create({
@@ -110,7 +114,7 @@ app.post('/classrooms', async (req, res) => {
 })
 
 // update an existing classroom by id
-app.put('/classrooms/:id', async (req, res) => {
+app.put('/classrooms/:id',authenticateToken, async (req, res) => {
     try {
         const id = parseInt(req.params.id)
         const { name, capacity } = req.body
@@ -125,16 +129,53 @@ app.put('/classrooms/:id', async (req, res) => {
 })
 // delete specific classroom
 app.delete('/classrooms/:id', authenticateToken, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const classroom = await prisma.classrooms.delete({
-        where: { id },
-      });
-      res.json(classroom);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+  try {
+    const id = parseInt(req.params.id);
+
+    // Check if the classroom has any students
+    const classroom = await prisma.classrooms.findUnique({
+      where: { id },
+      include: { students: true },
+    });
+
+    if (!classroom) {
+      return res.status(404).json({ error: 'Classroom not found' });
     }
-  });
+
+    if (classroom.students.length > 0) {
+      // Relocate students to another existing classroom
+      const existingClassrooms = await prisma.classrooms.findMany({
+        where: { id: { not: id } },
+      });
+
+      if (existingClassrooms.length === 0) {
+        return res.status(400).json({ error: 'No other classrooms available to relocate students' });
+      }
+
+      const randomIndex = Math.floor(Math.random() * existingClassrooms.length);
+      const newClassroom = existingClassrooms[randomIndex];
+
+      const updateStudents = classroom.students.map((student) => {
+        return prisma.students.update({
+          where: { id: student.id },
+          data: { classroom_id: newClassroom.id },
+        });
+      });
+
+      await prisma.$transaction(updateStudents);
+    }
+
+    // Delete the classroom
+    const deletedClassroom = await prisma.classrooms.delete({
+      where: { id },
+    });
+
+    res.json(deletedClassroom);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // get all students
 app.get('/students', async (req, res) => {
 try {
@@ -245,7 +286,7 @@ app.post('/students/:id/siblings', authenticateToken, async (req, res) => {
     }
   });
 //search specific student siblings
-app.get('/students/:id/siblings', authenticateToken, async (req, res) => {
+app.get('/students/:id/siblings2', authenticateToken, async (req, res) => {
     try {
       const { id } = req.params;
   
@@ -289,6 +330,64 @@ app.get('/students/:id/siblings', authenticateToken, async (req, res) => {
       res.status(500).json({ error: error.message });
     }
   });
+  //get specific student siblings info with class info
+app.get('/students/:id/siblings', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find the student's siblings
+    const siblings = await prisma.siblings.findMany({
+      where: {
+        OR: [
+          { student_id: parseInt(id) },
+          { sibling_id: parseInt(id) },
+        ],
+      },
+      include: { 
+        student: {
+          include: {
+            classroom: true,
+          }
+        },
+      },
+    });
+
+    if (siblings.length === 0) {
+      return res.json({
+        message: 'this student does not have siblings',
+      });
+    }
+
+    const siblingsWithInfo = await Promise.all(siblings.map(async (sibling) => {
+      const siblingInfo = await prisma.students.findUnique({
+        where: {
+          id: sibling.sibling_id,
+        },
+        include: {
+          classroom: true,
+        },
+      });
+
+      return {
+        id: sibling.id,
+        student_id: sibling.student_id,
+        sibling_id: sibling.sibling_id,
+        student: {
+          ...sibling.student,
+          classroom_name: sibling.student.classroom.name,
+        },
+        sibling: {
+          ...siblingInfo,
+          classroom_name: siblingInfo.classroom.name,
+        },
+      };
+    }));
+
+    res.json(siblingsWithInfo);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 //delete student sibling
 app.delete('/students/siblings/:id', authenticateToken, async (req, res) => {
     try {

@@ -12,7 +12,7 @@ datasource db {
 //this code creates the classrooms table with id,name,capacity
 model classrooms {
   id        Int      @id @default(autoincrement())
-  name      String
+name      String     @unique
   capacity  Int
   students  students[]
 }
