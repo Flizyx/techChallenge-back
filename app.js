@@ -454,6 +454,18 @@ app.delete('/students/:id', authenticateToken, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+//delete specific sibling relationship
+app.delete('/siblings/:id', authenticateToken, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const sibling = await prisma.siblings.delete({
+      where: { id },
+    });
+    res.json(sibling);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 // validate if a user has admin privileges
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
