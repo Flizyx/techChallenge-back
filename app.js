@@ -36,7 +36,7 @@ const PORT = process.env.PORT || 3001
 //                     name,
 //                     email,
 //                     password: hashedPassword,
-//                     role: 'USER',
+//                     role: 'USER', //or admin
 //                 },
 //             });
 //             const createdUser = await prisma.users.findUnique({
